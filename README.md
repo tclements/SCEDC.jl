@@ -12,7 +12,7 @@ California Earthquake Data Center) Open Dataset hosted on Amazon Web Services.
 ## Installation
 
 ```julia
-julia> import Pkg; Pkg.add(PackageSpec(url="https://github.com/tclements/SCEDC.jl", rev="master"))
+julia> using Pkg; Pkg.add(PackageSpec(url="https://github.com/tclements/SCEDC.jl", rev="master"))
 ```
 
 **Note:** This project is *only* designed to work on AWS EC2 at the moment.
