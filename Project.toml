@@ -1,0 +1,13 @@
+name = "SCEDC"
+uuid = "b054d04a-c980-4661-b119-2705324740b0"
+authors = ["Tim Clements <thclements@g.harvard.edu>"]
+version = "0.1.0"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
