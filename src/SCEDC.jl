@@ -1,8 +1,9 @@
 module SCEDC
 
-using Dates, CSV, DataFrames, AWSS3, AWSCore, Distributed
+using Dates, CSV, DataFrames, AWSS3, AWSCore, AWSSDK, Random, DelimitedFiles, Distributed
+include("athena.jl")
 
-export scedctransfer
+export scedctransfer, athenasetup
 
 function diskusage(dir)
 	s = read(`du -s $dir`, String)
