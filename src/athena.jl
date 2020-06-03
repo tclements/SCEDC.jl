@@ -1,12 +1,12 @@
-export athenasetup, scedcquery 
+export athenasetup, scedcquery
 """
   athenasetup(aws,bucket)
 
 Create AWS Athena database and table for SQL queries.
 
 # Arguments
-`aws::AWSConfig`: AWSConfig configuration dictionary
-`bucket::String`: Name of AWS bucket to store query results
+- `aws::AWSConfig`: AWSConfig configuration dictionary
+- `bucket::String`: Name of AWS bucket to store query results
 """
 function athenasetup(aws::AWSConfig,bucket::String;
                     database::String="scedcindex",
@@ -60,10 +60,26 @@ end
 
 Use AWS Athena to query SCEDC-pds database.
 
+Possible queries use these parameters:
+- `ms_filename::String`: Name of miniSEED file, e.g. SBCPSLOBHZ01_2020153.ms
+- `net::String`: Network identifier, e.g. CI, AZ, etc..
+- `seedchan::String`: SEED channel, e.g. BHZ, HHN, LHE, etc..
+- `location::String`: Station location, e.g. 00, 01, 00, etc..
+- `lat::double`: Station latitude, e.g. 34.5
+- `lon::double`: Station longitude, e.g. -117
+- `sample_rate::double`: Station sampling rate, in Hz
+
+Logical operators available for queries include:
+    - `Logical Operators`: `and`, `or`, `not`
+    - `Comparison Operators`: `<`, `>`, `<=`, `>=`, `=`, `!=`
+    - `Range Operator`: `between`
+See https://docs.aws.amazon.com/athena/latest/ug/presto-functions.html for possible operators.
+
+
 # Arguments
-`aws::AWSConfig`: AWSConfig configuration dictionary
-`bucket::String`: Name of AWS bucket to store query results
-`query::String`: SQL query for SCEDC-pds database.
+- `aws::AWSConfig`: AWSConfig configuration dictionary
+- `bucket::String`: Name of AWS bucket to store query results
+- `query::String`: SQL query for SCEDC-pds database.
 
 # Returns
 Array of filepaths matching query in scedc-pds bucket.
