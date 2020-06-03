@@ -1,4 +1,4 @@
-export athenasetup, scedcquery
+export athenasetup, athenaquery
 """
   athenasetup(aws,bucket)
 
@@ -56,7 +56,7 @@ function athenasetup(aws::AWSConfig,bucket::String;
 end
 
 """
-  scedcquery(aws,bucket,query)
+  athenaquery(aws,bucket,query)
 
 Use AWS Athena to query SCEDC-pds database.
 
@@ -98,7 +98,7 @@ query =  "lat between 34.00 and 34.50 and lon between -117 and -116"
 query = "seedchan LIKE 'BH%' and year_doy > '2016_150' and year_doy<'2016_157'"
 
 """
-function scedcquery(aws::AWSConfig,bucket::String, query::String;
+function athenaquery(aws::AWSConfig,bucket::String, query::String;
                     database::String="scedcindex",
                     table::String="scedc_parquet",
                     clean::Bool=true)
@@ -139,15 +139,4 @@ function scedcquery(aws::AWSConfig,bucket::String, query::String;
         s3_delete(aws,bucket,querypath*".metadata")
     end
     return scedcpath.(filelist)
-end
-
-"""
-  scedcpath(filename)
-
-Convert filename to scedc-pds path.
-"""
-function scedcpath(filename::String)
-    year = filename[14:17]
-    day = filename[18:20]
-    return "continuous_waveforms/" * year * '/' * year * '_' * day * '/' * filename
 end
