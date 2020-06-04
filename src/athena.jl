@@ -13,6 +13,11 @@ function athenasetup(aws::AWSConfig,bucket::String;
                     table::String="scedc_parquet",
                     clean::Bool=true)
 
+    # make sure a bucket exists for queries
+    if bucket ∉ s3_list_buckets(aws)
+        s3_create_bucket(aws,bucket)
+    end
+
     # create database
     println("Creating database '$database' ",now())
     AWSSDK.Athena.start_query_execution(aws,QueryString="create database $database",
@@ -61,6 +66,8 @@ end
 Use AWS Athena to query SCEDC-pds database.
 
 Possible queries use these parameters:
+- `year::String`: Year data was recorded, in YYYY format.
+- `year_doy::String`: Year and day data was recorded, in YYYY_DDD format.
 - `ms_filename::String`: Name of miniSEED file, e.g. SBCPSLOBHZ01_2020153.ms
 - `net::String`: Network identifier, e.g. CI, AZ, etc..
 - `seedchan::String`: SEED channel, e.g. BHZ, HHN, LHE, etc..
@@ -95,13 +102,18 @@ query = "year_doy > '2016_150' and year_doy<'2016_157'"
 query =  "lat between 34.00 and 34.50 and lon between -117 and -116"
 
 4. Compound queries
-query = "seedchan LIKE 'BH%' and year_doy > '2016_150' and year_doy<'2016_157'"
+query = "year = 2020 and seedchan LIKE 'BH%'"
 
 """
 function athenaquery(aws::AWSConfig,bucket::String, query::String;
                     database::String="scedcindex",
                     table::String="scedc_parquet",
                     clean::Bool=true)
+
+    # make sure a bucket exists for queries
+    if bucket ∉ s3_list_buckets(aws)
+        s3_create_bucket(aws,bucket)
+    end
 
     # query the table
     output = AWSSDK.Athena.start_query_execution(aws,
