@@ -32,12 +32,16 @@ function athenasetup(aws::AWSConfig,bucket::String;
                """ 's3://scedc-pds/continuous_waveforms/index/parquet/'""" *
                """ TBLPROPERTIES ("parquet.compress"="SNAPPY");"""
 
+    sleep(1)
+
     # create table
     println("Creating table '$table' ",now())
     AWSSDK.Athena.start_query_execution(aws,QueryString=tablestr,
        ResultConfiguration=["OutputLocation" => "s3://$bucket/queries/"],
        ClientRequestToken=randstring(32),
        QueryExecutionContext = ["Database" => database])
+
+    sleep(1)
 
     # update partitions
     println("Repairing table '$table' ",now())
@@ -53,6 +57,8 @@ function athenasetup(aws::AWSConfig,bucket::String;
         if queryresult["QueryExecutionDetail"]["Status"] == "SUCCEEDED"
             finished = true
             println("REPAIR table $table finished ",now())
+        elseif queryresult["QueryExecutionDetail"]["Status"]["State"] == "FAILED"
+            error("REPAIR TABLE '$table' FAILED ",now())
         else
             sleep(10)
         end
@@ -129,6 +135,8 @@ function athenaquery(aws::AWSConfig,bucket::String, query::String;
          if queryresult["QueryExecutionDetail"]["Status"]["State"] == "SUCCEEDED"
              finished = true
              println("QUERY '$query' finished ",now())
+         elseif queryresult["QueryExecutionDetail"]["Status"]["State"] == "FAILED"
+             error("QUERY '$query' FAILED ",now())
          else
              sleep(1)
          end
