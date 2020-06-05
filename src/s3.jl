@@ -1,66 +1,4 @@
-export ec2transfer, s3query, scedcpath
-
-"""
-  ec2transfer(aws,filelist,OUTDIR)
-
-Transfer files using pmap from S3 to EC2.
-# Arguments
-- `aws::AWSConfig`: AWSConfig configuration dictionary
-- `bucket::String`: S3 bucket to download from.
-- `filelist::Array{String}`: Filepaths to download in bucket.
-- `OUTDIR::String`: The output directory on EC2 instance.
-
-"""
-function ec2transfer(aws::AWSConfig,bucket::String,filelist::Array{String},OUTDIR::String;)
-
-	# check being run on AWS
-	tstart = now()
-	LOC =  !localhost_is_ec2() && error("ec2transfer must be run on an EC2 instance. Exiting.")
-
-	println("Starting Download...      $(now())")
-	println("Using $(nworkers()) cores...")
-
-	# send files everywhere
-	@eval @everywhere aws=$aws
-	@eval @everywhere filelist=$filelist
-
-	# create output files
-	OUTDIR = expanduser(OUTDIR)
-	outfiles = [joinpath(OUTDIR,f) for f in filelist]
-	filedir = unique([dirname(f) for f in outfiles])
-	for ii = 1:length(filedir)
-		if !isdir(filedir[ii])
-			mkpath(filedir[ii])
-		end
-	end
-
-    # send outfiles everywhere
-	@eval @everywhere outfiles=$outfiles
-	# do transfer to ec2
-    startsize = diskusage(OUTDIR)
-	pmap(s3_file_map,fill(aws,length(outfiles)),fill(bucket,length(outfiles)),filelist,outfiles)
-
-	println("Download Complete!        $(now())          ")
-	tend = now()
-	# check data in directory
-	endsize = diskusage(OUTDIR)
-	downloadsize = (endsize - startsize) / 1024
-	downloadseconds = (tend - tstart).value / 1000
-	println("Download took $(Dates.canonicalize(Dates.CompoundPeriod(tend - tstart)))")
-	if downloadsize / downloadseconds > 1024
-		downloadsize /= 1024
-		println("Download rate $(downloadsize / downloadseconds) GB/s")
-	else
-		println("Download rate $(downloadsize / downloadseconds) MB/s")
-	end
-	return nothing
-end
-
-function diskusage(dir)
-	s = read(`du -s $dir`, String)
-	return parse(Int, split(s)[1])
-end
-
+export s3query, scedcpath
 
 function df_subset(df::DataFrame,col::String,colsymbol::Symbol)
         col = regex_helper(col)
@@ -88,11 +26,6 @@ function regex_helper(reg::String)
             reg = Regex(reg)
     end
     return reg
-end
-
-function s3_file_map(aws::AWSConfig,bucket::String,filein::String,fileout::String)
-    s3_get_file(aws, bucket, filein, fileout)
-    println("Downloading file: $filein       \r")
 end
 
 function filenamecleaner(filename::String)
