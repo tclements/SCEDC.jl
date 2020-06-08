@@ -32,5 +32,10 @@ OUTDIR = "~/data"
 
 # query s3 for matching stations
 filelist = s3query(aws, startdate, enddate=enddate, network=network,channel=channel)
+
+# download mseed files to disk 
 ec2download(aws,bucket,filelist,OUTDIR)
+
+# or stream to an Array of SeisIO.SeisData 
+LHs = ec2stream(aws,bucket,filelist)
 ```
