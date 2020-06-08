@@ -1,6 +1,7 @@
 module SCEDC
 
-using Dates, CSV, DataFrames, AWSS3, AWSCore, AWSSDK, Random, DelimitedFiles, Distributed
+using Dates, DelimitedFiles, Distributed, Random
+using AWSCore, AWSS3, AWSSDK,CSV, DataFrames, SeisIO 
 
 # include modules
 include("s3.jl")
