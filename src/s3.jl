@@ -36,10 +36,12 @@ end
 function indexpath(d::Date)
     days = (d - Date(Year(d))).value + 1
     n = ndigits(days)
+	jstr = ('0' ^ (3 - n)) * string(days)
+	ystr = string(Year(d).value)
     outstring = "continuous_waveforms/index/csv/year="
-    outstring *= string(Year(d).value) * "/year_doy="
-    outstring *= string(Year(d).value) * '_' * ('0' ^ (3 - n)) * string(days)
-    outstring *= "/index.csv"
+    outstring *= ystr * "/year_doy="
+    outstring *= ystr * '_' * jstr
+    outstring *= "/$(ystr)_$(jstr)_waveform_index.csv"
     return outstring
 end
 
