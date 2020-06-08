@@ -21,13 +21,16 @@ julia> using Pkg; Pkg.add(PackageSpec(url="https://github.com/tclements/SCEDC.jl
 
 ```julia
 # download data using SCEDC on AWS
-using SCEDC, Dates
-
+using SCEDC, Dates, AWSCore
+aws = aws_config(region="us-west-2")
+bucket = "scedc-pds"
 startdate = Date("2016-07-01")
 enddate = Date("2016-07-01")
 network = "CI"
-channel = "HH?"
+channel = "LH?"
 OUTDIR = "~/data"
-scedctransfer(OUTDIR, startdate, enddate=enddate, network=network,
-         channel=channel)
+
+# query s3 for matching stations
+filelist = s3query(aws, startdate, enddate=enddate, network=network,channel=channel)
+ec2download(aws,bucket,filelist,OUTDIR)
 ```
