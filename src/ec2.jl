@@ -88,7 +88,8 @@ Stream files using pmap from S3 to EC2.
 - `ungap::Bool`: Ungap data after streaming.
 - `resample::Bool`: Resample data after streaming.
 - `fs::Float64`: New sampling rate.
-
+- `rtype`: Return requested data as `SeisData` or `Array` of `SeisData`. Defaults
+    to `SeisData`. Use `Array` to return an `Array` of `SeisData`.
 """
 function ec2stream(
     aws::AWSConfig,bucket::String,filelist::Array{String};
@@ -102,6 +103,7 @@ function ec2stream(
     unscale::Bool = false,
     resample::Bool = false,
 	fs::Real = Float64(0),
+    rtype = SeisData,
 )
 
 	# check being run on AWS
@@ -129,7 +131,11 @@ function ec2stream(
         fill(resample,length(filelist)),
         fill(fs,length(filelist)),
     )
-	return merge(Sarray)
+    if rtype == SeisData
+	    return merge(Sarray)
+    end
+    return Sarray
+
 end
 
 function s3_file_map(aws::AWSConfig,bucket::String,filein::String,fileout::String)
