@@ -18,7 +18,7 @@ function ec2download(
 
 	# check being run on AWS
 	tstart = now()
-	LOC =  !localhost_is_ec2() && error("ec2transfer must be run on an EC2 instance. Exiting.")
+	!localhost_is_ec2() && @warn("Running locally. Run on EC2 for maximum performance.")
 
 	println("Starting Download...      $(now())")
 	println("Using $(nworkers()) cores...")
@@ -107,7 +107,7 @@ function ec2stream(
 )
 
 	# check being run on AWS
-	LOC =  !localhost_is_ec2() && error("ec2stream must be run on an EC2 instance. Exiting.")
+	!localhost_is_ec2() && @warn("Running locally. Run on EC2 for maximum performance.")
 
 	# send files everywhere
 	@eval @everywhere aws=$aws

@@ -92,7 +92,7 @@ function s3query(aws::AWSConfig,
                   minlongitude::Union{Float64,Nothing}=nothing,
                   maxlongitude::Union{Float64,Nothing}=nothing)
 
-	LOC =  !localhost_is_ec2() && error("scedctransfer must be run on an EC2 instance. Exiting.")
+	!localhost_is_ec2() && @warn("Running locally. Run on EC2 for maximum performance.")
 	@eval @everywhere aws=$aws
     firstdate = Date(2000,1,1)
 
