@@ -1,7 +1,7 @@
-export ec2download, ec2stream
+export ec2download, ec2stream, getXML
 
 """
-  ec2download(aws,filelist,OUTDIR)
+  ec2download(aws,bucket,filelist,OUTDIR)
 
 Download files using pmap from S3 to EC2.
 # Arguments
@@ -13,7 +13,8 @@ Download files using pmap from S3 to EC2.
 """
 function ec2download(
     aws::AWSConfig,bucket::String,filelist::Array{String},OUTDIR::String;
-    v::Int=0
+    v::Int=0,
+	XML::Bool=false,
 )
 
 	# check being run on AWS
@@ -35,6 +36,11 @@ function ec2download(
 		if !isdir(filedir[ii])
 			mkpath(filedir[ii])
 		end
+	end
+
+	# get XML
+	if XML
+		getXML(aws,bucket,filelist,OUTDIR)
 	end
 
     # send outfiles everywhere
@@ -136,6 +142,48 @@ function ec2stream(
     end
     return Sarray
 
+end
+
+"""
+  getXML(aws,bucket,filelist,OUTDIR)
+
+Download XML files using pmap from S3 to EC2.
+# Arguments
+- `aws::AWSConfig`: AWSConfig configuration dictionary
+- `bucket::String`: S3 bucket to download from.
+- `filelist::Array{String}`: Filepaths to download in `bucket`.
+- `OUTDIR::String`: The output directory on EC2 instance.
+
+"""
+function getXML(aws::AWSConfig,bucket::String,filelist::AbstractArray, OUTDIR::String)
+	OUTDIR = expanduser(OUTDIR)
+	XMLDIR = joinpath(OUTDIR,"XML")
+	if !isdir(XMLDIR)
+		mkpath(XMLDIR)
+	end
+
+	basenames = basename.(filelist)
+	nets = [b[1:2] for b in basenames]
+	stas = [replace(b[3:7],"_"=>"") for b in basenames]
+
+	# only get response for CI station
+	ind = findall(nets .== "CI")
+	if length(ind) > 0
+		nets = nets[ind]
+		stas = stas[ind]
+	else
+		@warn("No XML for request.")
+	end
+
+	# get input/output files names
+	prefix = "FDSNstationXML/CI/"
+	infiles = [joinpath(prefix,"$(nets[ii])_$(stas[ii]).xml") for ii = 1:length(nets)]
+	infiles = unique(infiles)
+	outfiles = [joinpath(XMLDIR,basename(f)) for f in infiles]
+
+	# download files
+	pmap(s3_get_file,fill(aws,length(infiles)),fill(bucket,length(infiles)),infiles,outfiles)
+	return nothing
 end
 
 function s3_file_map(aws::AWSConfig,bucket::String,filein::String,fileout::String)
