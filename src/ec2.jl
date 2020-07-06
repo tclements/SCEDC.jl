@@ -10,6 +10,11 @@ Download files using pmap from S3 to EC2.
 - `filelist::Array{String}`: Filepaths to download in `bucket`.
 - `OUTDIR::String`: The output directory on EC2 instance.
 
+# Keywords
+- `v::Int=0`: Verbosity level. Set v = 1 for download progress.
+- `XML::Bool=false`: Download StationXML files for request. Downloads StationXML to
+    `joinpath(OUTDIR,"XML")`.
+
 """
 function ec2download(
     aws::AWSConfig,bucket::String,filelist::Array{String},OUTDIR::String;
@@ -40,7 +45,8 @@ function ec2download(
 
 	# get XML
 	if XML
-		getXML(aws,bucket,filelist,OUTDIR)
+		XMLDIR = joinpath(OUTDIR,"XML")
+		getXML(aws,bucket,filelist,XMLDIR,v=v)
 	end
 
     # send outfiles everywhere
@@ -85,15 +91,17 @@ Stream files using pmap from S3 to EC2.
 - `aws::AWSConfig`: AWSConfig configuration dictionary
 - `bucket::String`: S3 bucket to download from.
 - `filelist::Array{String}`: Filepaths to stream from `bucket`.
-- `demean::Bool`: Demean data after streaming.
-- `detrend::Bool`: Detrend data after streaming.
-- `msr::Bool`: Get multi-stage response after streaming.
-- `prune::Bool`: Prune empty channels after streaming.
-- `rr::Bool`: Remove instrument response after streaming.
-- `taper::Bool`: Taper data after streaming.
-- `ungap::Bool`: Ungap data after streaming.
-- `resample::Bool`: Resample data after streaming.
-- `fs::Float64`: New sampling rate.
+
+# Keywords
+- `demean::Bool=false`: Demean data after streaming.
+- `detrend::Bool=false`: Detrend data after streaming.
+- `msr::Bool=false`: Get multi-stage response after streaming.
+- `prune::Bool=false`: Prune empty channels after streaming.
+- `rr::Bool=false`: Remove instrument response after streaming.
+- `taper::Bool=false`: Taper data after streaming.
+- `ungap::Bool=false`: Ungap data after streaming.
+- `resample::Bool=false`: Resample data after streaming.
+- `fs::Float64=0`: New sampling rate.
 - `rtype`: Return requested data as `SeisData` or `Array` of `SeisData`. Defaults
     to `SeisData`. Use `Array` to return an `Array` of `SeisData`.
 """
@@ -145,21 +153,37 @@ function ec2stream(
 end
 
 """
-  getXML(aws,bucket,filelist,OUTDIR)
+  getXML(aws,bucket,filelist,XMLDIR)
 
 Download XML files using pmap from S3 to EC2.
 # Arguments
 - `aws::AWSConfig`: AWSConfig configuration dictionary
 - `bucket::String`: S3 bucket to download from.
 - `filelist::Array{String}`: Filepaths to download in `bucket`.
-- `OUTDIR::String`: The output directory on EC2 instance.
+- `XMLDIR::String`: The output directory for stationXML files on EC2 instance.
 
+# Keywords
+- `v::Int=0`: Verbosity level. Set v = 1 for download progress.
+- `getall::Bool=false`: Download all available StationXML files from `scedc-pds`.
 """
-function getXML(aws::AWSConfig,bucket::String,filelist::AbstractArray, OUTDIR::String)
-	OUTDIR = expanduser(OUTDIR)
-	XMLDIR = joinpath(OUTDIR,"XML")
+function getXML(
+	aws::AWSConfig,
+	bucket::String,
+	filelist::AbstractArray,
+	XMLDIR::String;
+	v::Int=0,
+	getall::Bool=false,
+)
+
 	if !isdir(XMLDIR)
 		mkpath(XMLDIR)
+	end
+
+	# get all files if needed
+	prefix = "FDSNstationXML/CI/" # change this if more nets added
+	if getall
+		filelist = collect(s3_list_keys(aws,bucket,prefix))
+		filelist = [replace(f,".xml"=>"_") for f in filelist]
 	end
 
 	basenames = basename.(filelist)
@@ -176,13 +200,28 @@ function getXML(aws::AWSConfig,bucket::String,filelist::AbstractArray, OUTDIR::S
 	end
 
 	# get input/output files names
-	prefix = "FDSNstationXML/CI/"
 	infiles = [joinpath(prefix,"$(nets[ii])_$(stas[ii]).xml") for ii = 1:length(nets)]
 	infiles = unique(infiles)
 	outfiles = [joinpath(XMLDIR,basename(f)) for f in infiles]
 
 	# download files
-	pmap(s3_get_file,fill(aws,length(infiles)),fill(bucket,length(infiles)),infiles,outfiles)
+	if v > 0
+	    pmap(
+            s3_file_map,
+			fill(aws,length(infiles)),
+			fill(bucket,length(infiles)),
+			infiles,
+			outfiles,
+        )
+    else
+		pmap(
+			s3_get_file,
+			fill(aws,length(infiles)),
+			fill(bucket,length(infiles)),
+			infiles,
+			outfiles,
+		)
+    end
 	return nothing
 end
 
