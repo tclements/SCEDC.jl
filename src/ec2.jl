@@ -183,7 +183,8 @@ function getXML(
 	prefix = "FDSNstationXML/CI/" # change this if more nets added
 	if getall
 		filelist = collect(s3_list_keys(aws,bucket,prefix))
-		filelist = [replace(f,".xml"=>"_") for f in filelist]
+		filelist = [replace(f,"_"=>"") for f in filelist]
+		filelist = [replace(f,".xml"=>"__") for f in filelist]
 	end
 
 	basenames = basename.(filelist)
