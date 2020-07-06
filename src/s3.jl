@@ -57,13 +57,12 @@ function scedcpath(filename::String)
 end
 
 """
-  s3query(aws,OUTDIR,startdate)
+  s3query(aws,startdate)
 
 Use S3 to query SCEDC-pds database.
 
 # Arguments
 - `aws::AWSConfig`: AWSConfig configuration dictionary
-- `OUTDIR::String`: The output directory.
 - `startdate::Date`: The start day of the download.
 - `enddate::Date`: The (optional) end day of the download.
 - `network::String`: Network to download from. If network = "*" or is unspecified,
