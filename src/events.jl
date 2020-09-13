@@ -1,69 +1,10 @@
-export eventquery
+export eventpaths, eventstream
+import SeisIO: merge,merge!
 
 """
-    read_catalog(catalog)
+     eventpaths(aws)
 
-Read a SCEDC-format listing of catalog data from the Southern California Earthquake Data
-Center. For a format description, see http://www.data.scec.org/ftp/catalogs/SCEC_DC.
-
-Catalog maybe a filepath or an `IOStream`. 
-"""
-function read_catalog(catalog)
-    cols = [
-        "YYYY/MM/DD",
-        "HH:mm:SS.ss",
-        "ET",
-        "GT",
-        "MAG",
-        "M",
-        "LAT",
-        "LON",
-        "DEPTH",
-        "Q",
-        "EVID",
-        "NPH",
-        "NGRM",
-    ]
-    types = [
-        String,
-        String,
-        String,
-        String,
-        Float64,
-        String,
-        Float64,
-        Float64,
-        Float64,
-        String,
-        Int,
-        Int,
-        Int,
-    ]
-
-    # read into dataframe
-    df = CSV.File(
-        catalog,
-        header=cols,
-        datarow=11,
-        types=types,
-        comment="#",
-        delim=' ',
-        ignorerepeated=true,
-        silencewarnings=true,
-    ) |> DataFrame
-    dropmissing!(df)
-
-    # format dates 
-    dateformater = Dates.DateFormat("y/m/dTH:M:S.s")
-    df["EVENTTIME"] = DateTime.(df[!,"YYYY/MM/DD"] .* "T" .* df[!,"HH:mm:SS.ss"],dateformater)
-    select!(df,Not([Symbol("YYYY/MM/DD"),Symbol("HH:mm:SS.ss")]))
-    return df
-end
-        
-"""
-    eventquery(aws)
-
-Use S3 to query SCEDC-pds event catalog. Returns a DataFrame of events.
+Use S3 to query SCEDC-pds event paths. Returns array of event S3 paths.
 
 # Arguments
 - `aws::AWSConfig`: AWSConfig configuration dictionary
@@ -80,11 +21,11 @@ Use S3 to query SCEDC-pds event catalog. Returns a DataFrame of events.
 - `mindepth::Real`: Minimum event depth in km.
 - `maxdepth::Real`: Maximum event depth in km.
 - `eventtype::String`: Event type: {"eq"=>"earthquake", "qb"=> "quarry blast", 
-    "sn"=>"sonic boom', "nt"=>"nuclear blast", "uk"=>"not reported","*"=>"all events"}
+"sn"=>"sonic boom', "nt"=>"nuclear blast", "uk"=>"not reported","*"=>"all events"}
 """
-function eventquery(
+function eventpaths(
     aws::AWSConfig;
-    starttime::TimeType=Date(1932,1,1),
+    starttime::TimeType=Date(1977,1,1),
     endtime::TimeType=Today(),
     minlatitude::Real=-90,
     maxlatitude::Real=90,
@@ -96,38 +37,115 @@ function eventquery(
     maxdepth::Real=100,
     eventtype::String="*",
 )
-    all_types = ["eq","qb","sn","nt","uk","*"]
-    # do filein
-    @assert starttime <= endtime "Starttime ($starttime) must be less than endtime ($endtime)."
-    @assert minlatitude >= -90 "Minimum latitude must be greater than -90"
-    @assert maxlatitude <= 90 "Maximum latitude must be less than 180"
-    @assert minlongitude >= -180 "Minimum longitude must be greater than -180"
-    @assert maxlongitude <= 180 "Maximum longitude must be less than 180"
-    @assert minmagnitude >= -10 "Minimum magnitude must be greater than -10"
-    @assert maxmagnitude <= 10 "Maximum magnitude must be less than 10"
-    @assert in(lowercase(eventtype), all_types) "eventtype '$eventtype' must be one of $all_types"
+    @assert starttime >= Date(1977,1,1) "Starttime must be greater or equal to $(Date(1977,1,1))"
+    # quert possible events from catalog 
+    eventdf = catalogquery(
+        aws,
+        starttime=starttime,
+        endtime=endtime,
+        minlatitude=minlatitude,
+        maxlatitude=maxlatitude,
+        minlongitude=minlongitude,
+        maxlongitude=maxlongitude,
+        minmagnitude=minmagnitude,
+        mindepth=mindepth,
+        maxdepth=maxdepth,
+        eventtype=eventtype
+    )
 
-    # get each year 
-    years = year(starttime):year(endtime)
-    alldf = DataFrame()
-    for yr in years
-        yrstream = s3_get(aws,"scedc-pds","earthquake_catalogs/SCEC_DC/$yr.catalog")
-        df = read_catalog(yrstream)
-        filter!(row -> starttime <= row.EVENTTIME <= endtime, df)
-        filter!(row -> minlatitude <= row.LAT <= maxlatitude,df)
-        filter!(row -> minlongitude <= row.LON <= maxlongitude,df)
-        filter!(row -> minmagnitude <= row.MAG <= maxmagnitude,df)
-        filter!(row -> mindepth <= row.DEPTH <= maxdepth,df)
-        if eventtype != "*"
-            filter!(row -> row.ET == eventtype, df)
-        end
-        if !isempty(df)
-            append!(alldf,df)
-        end
-    end
+    N = size(eventdf,1)
+    epaths = ["event_waveforms/$(year(row.EVENTTIME))/$(year(row.EVENTTIME))_$(lpad(dayofyear(row.EVENTTIME),3,'0'))/$(row.EVID).ms" for row in eachrow(eventdf)]
+    ppaths = ["event_phases/$(year(row.EVENTTIME))/$(year(row.EVENTTIME))_$(lpad(dayofyear(row.EVENTTIME),3,'0'))/$(row.EVID).phase" for row in eachrow(eventdf)]
+    paths = [epaths[ii] for ii = 1:length(epaths) if (s3_exists(aws,"scedc-pds",epaths[ii])) & (s3_exists(aws,"scedc-pds",ppaths[ii]))] 
 
-    if isempty(alldf)
-        throw(DomainError("No events for query."))
-    end
-    return alldf   
+    # check that events actually exist
+    if isempty(paths)
+        throw(ErrorException("No events for query."))
+    end 
+    return paths
 end
+
+function eventdownload()
+end
+
+function eventstream(aws::AWSConfig;
+    starttime::TimeType=Date(1977,1,1),
+    endtime::TimeType=Today(),
+    minlatitude::Real=-90,
+    maxlatitude::Real=90,
+    minlongitude::Real=-180,
+    maxlongitude::Real=180,
+    minmagnitude::Real=-10,
+    maxmagnitude::Real=10,
+    mindepth::Real=-10,
+    maxdepth::Real=100,
+    eventtype::String="*",
+)
+    s3paths = eventpaths(
+        aws,
+        starttime=starttime,
+        endtime=endtime,
+        minlatitude=minlatitude,
+        maxlatitude=maxlatitude,
+        minlongitude=minlongitude,
+        maxlongitude=maxlongitude,
+        minmagnitude=minmagnitude,
+        mindepth=mindepth,
+        maxdepth=maxdepth,
+        eventtype=eventtype
+    )
+
+    # grab event id and date from s3path
+    dateformater = DateFormat("yyyy_ddd")
+    evid = [parse(Int,replace(basename(s),".ms"=>"")) for s in s3paths]
+    s3dates = Date.([basename(dirname(s)) for s in s3paths],dateformater)
+    s3phases = [phasequery(aws,evid[ii],s3dates[ii]) for ii = 1:length(evid)]
+    s3events = ec2stream(aws,"scedc-pds",s3paths,rtype=Array)
+
+    for ii = 1:length(s3events)
+        s3phases[ii] = merge(s3phases[ii],s3events[ii])
+    end
+    return s3phases
+end
+
+function merge!(EC::EventChannel,SC::SeisChannel)
+    if EC.id != SC.id 
+        throw(ErrorException("EventChannel ID $(EC.id) and SeisChannel ID $(SC.id) do not match."))
+    end
+    for f in SeisIO.datafields
+        fval = getfield(SC,f)
+        if !isempty(fval)
+            setfield!(EC,f,fval)
+        end
+    end
+    return nothing
+end
+merge!(SC::SeisChannel,EC::EventChannel,) = merge!(EC,SC)
+merge(EC::EventChannel,SC::SeisChannel) = (U = deepcopy(EC);merge!(U,SC);return U)
+merge(SC::SeisChannel,EC::EventChannel) = merge(EC,SC)
+
+function merge(SE::SeisEvent,SD::SeisData)
+    newEvent = SeisEvent()
+    newEvent.hdr = SE.hdr
+    newEvent.source = SE.source
+    newEvent.data = merge(SE.data,SD)
+    return newEvent
+end
+merge(SD::SeisData,SE::SeisEvent) = merge(SE,SD)
+
+function merge(ETD::EventTraceData,SD::SeisData)
+    N = length(SD.id)
+    ETDdict = Dict(ETD.id[ii]=>ii for ii = 1:length(ETD.id))
+    ETDkeys = keys(ETDdict)
+    newETD = EventTraceData(N)
+    for ii = 1:N
+        if in(SD.id[ii],ETDkeys)
+            ind = ETDdict[SD.id[ii]]
+            newETD[ii] = merge(SD[ii],ETD[ind])
+        else
+            newETD[ii] = EventTraceData(SD[ii])[1] # need to make EventChannel(SeisChannel())
+        end
+    end
+    return newETD 
+end
+merge(SD::SeisData,ETD::EventTraceData) = merge(ETD,SD)
