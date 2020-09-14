@@ -21,15 +21,19 @@ MAGTYPE_MAPPING = Dict(
 )
 
 POLARITY_MAPPING = Dict(
-    "c"=> 'U', 
-    "u"=> 'U', 
-    "d"=> 'D', 
-    "r"=> ' ', 
-    "."=> ' ',
+    "c."=> 'U',
+    ".c"=> 'U', 
+    "u."=> 'U', 
+    "d."=> 'D', 
+    ".d"=> 'D',
+    "r."=> ' ', 
+    ".."=> ' ',
+    ".."=> ' ',
+    ""  => ' ', 
 )
 
-function read_phase(phase)
-    pstr = String(phase)
+function read_phase(phasestream::AbstractArray)
+    pstr = String(phasestream)
     parr = split(pstr,"\n")
     parr = strip.(parr[1:end-1])
     event_header = String(parr[1])
@@ -39,11 +43,9 @@ function read_phase(phase)
     # get event info from first line of phase file 
     evid, etype, origin_time, eqmag, eqloc = parse_event_header(event_header,N)
 
-    # make EventChannels
-    EQ = EventTraceData(N)
-    for ii = 1:N
-        EQ[ii] = parse_phase(String(parr[ii]))
-    end
+    # need to wrap this 
+    df = phasestring2df(parr)
+    EQ = parse_phases(df)
     
     # make SeisHdr
     hdr = SeisHdr(id=evid,loc=eqloc,mag=eqmag,ot=origin_time,typ=etype)
@@ -69,23 +71,6 @@ function parse_event_header(header::String,N::Int)
     return evid, etype, origin_time, eqmag, eqloc
 end
 
-function parse_phase(phase_string::String)
-    net, sta, chan, loc, lat, lon, elev, phase, motion, onset, quality, dist, offset = split(phase_string)
-    net, sta, chan, loc, phase, motion, onset, quality = String.([net, sta, chan, loc, phase, motion, onset, quality])
-    polarity = POLARITY_MAPPING[motion[1:1]]
-    if polarity == ""
-        polarity = POLARITY_MAPPING[motion[2:2]]
-    end
-    lat, lon, elev, quality, dist, offset = parse.(Float64,[lat, lon, elev, quality, dist, offset])
-
-    # construct EventChannel
-    id = join([net,sta,loc,chan],".")
-    loc = GeoLoc(lat=lat,lon=lon,el=elev)
-    pha = SeisPha(d=dist,tt=offset,pol=polarity)
-    phacat = Dict(phase => pha)
-    return EventChannel(id=id,loc=loc,dist=dist,pha=phacat)
-end
-
 """
     phasequery(aws,eventid,eventtime)
 
@@ -102,12 +87,43 @@ function phasequery(aws::AWSConfig,eventid::Int,eventtime::TimeType)
     daynum = lpad(dayofyear(eventtime),3,'0')
     yr = year(eventtime)
     query = "event_phases/$yr/$(yr)_$daynum/$eventid.phase"
-
-    if s3_exists(aws,"scedc-pds",query)
+    phasestream = Array{UInt8}(undef,0)
+    try
         phasestream = s3_get(aws,"scedc-pds",query)
-    else
-        throw(ErrorException("Event $eventid on $eventtime could not be found."))
+    catch e
+        throw(e,"Event $eventid on $eventtime could not be found.")
     end
 
     return read_phase(phasestream)
+end
+
+function phasestring2df(phasestring::AbstractArray)
+    ns = [:NET,:STA,:CHAN,:LOC,:LAT,:LON,:ELEV,:PHASE,:MOTION,:ONSET,:QUAL,:DIST,:OFFSET]
+    df = DataFrame(permutedims(String.(hcat(split.(phasestring)...))),ns)
+    df[!,[:LAT,:LON,:ELEV,:QUAL,:DIST,:OFFSET]] .= parse.(Float64,df[!,[:LAT,:LON,:ELEV,:QUAL,:DIST,:OFFSET]])
+    df[!,:LOC] .= replace.(df[!,:LOC],"--"=>"00")
+    df[!,:POL] = map(x -> POLARITY_MAPPING[x], df[!,:MOTION])
+    return df
+end
+
+function parse_phases(df::DataFrame)
+    # construct EventChannel
+    N = size(unique(df,[:NET,:STA,:CHAN]),1)
+    EQ = EventTraceData(N)
+    for (ii,group) in enumerate(groupby(df,[:NET,:STA,:CHAN]))
+        EQ[ii] = df2phacat(group)
+    end
+    return EQ
+end
+
+function df2phacat(df::AbstractDataFrame)
+    N = size(df,1)
+    if N == 0 
+        throw(ErrorException("Empty DataFrame."))
+    end
+    id = join(df[1,[:NET,:STA,:LOC,:CHAN]],'.')
+    loc = GeoLoc(lat=df[1,:LAT],lon=df[1,:LON],el=df[1,:ELEV])
+    dist = df[1,:DIST]
+    phacat = Dict(df[ii,:PHASE]=>SeisPha(d=df[ii,:DIST],tt=df[ii,:OFFSET],pol=df[ii,:POL]) for ii = 1:N)
+    return EventChannel(id=id,loc=loc,dist=dist,pha=phacat)
 end
