@@ -305,8 +305,9 @@ function formatbytes(bytes::Real, digits::Int=1)
 end
 
 function diskusage(dir)
-	s = read(`du -s -b $dir`, String)
-	return parse(Int, split(s)[1])
+	s = read(`du -k $dir`, String)
+	kb = parse(Int, split(s)[1])
+	return 1024 * kb
 end
 
 """
