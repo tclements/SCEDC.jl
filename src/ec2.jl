@@ -146,7 +146,7 @@ function ec2stream(
         fill(fs,length(filelist)),
     )
     if rtype == SeisData
-	    return merge(Sarray)
+	    return SeisData(Sarray...)
     end
     return Sarray
 
