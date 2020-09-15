@@ -55,7 +55,7 @@ function read_catalog(catalog)
 
     # format dates 
     dateformater = Dates.DateFormat("y/m/dTH:M:S.s")
-    df["EVENTTIME"] = DateTime.(df[!,"YYYY/MM/DD"] .* "T" .* df[!,"HH:mm:SS.ss"],dateformater)
+    df["EVENTTIME"] = DateTime.(parse_hms.(df[!,"YYYY/MM/DD"],df[!,"HH:mm:SS.ss"]),dateformater)
     select!(df,Not([Symbol("YYYY/MM/DD"),Symbol("HH:mm:SS.ss")]))
     return df
 end
@@ -130,4 +130,41 @@ function catalogquery(
         throw(DomainError("No events for query."))
     end
     return alldf   
+end
+
+function parse_hms(d::String,hms::String)
+    # check that date matches HH:MM:SS.s syntax 
+    r = r"^[0-2][0-3]:[0-5][0-9]:[0:5][0-9].[0-9][0-9]"
+    if occursin(r,hms)
+        return d * "T" * hms
+    end
+
+    # string does not match 
+    strm=match(r"(?<hour>\d+):(?<minute>\d+):(?<second>\d+).(?<dec>\d+)",hms)
+    dec = parse(Int,strm[:dec])
+    h = parse(Int,strm[:hour])
+    m = parse(Int,strm[:minute])
+    s = parse(Int,strm[:second])
+
+    if s > 59 
+        m +=  s ÷ 60 
+        s = s % 60
+    end
+
+    if m > 59 
+        h += m ÷ 60 
+        m = m % 60 
+    end
+
+    if h > 23
+        newday = h ÷ 24
+        h = h % 24 
+        dateformater = DateFormat("yyyy/mm/dd")
+        d = Dates.format(Date(d,dateformater)+ Day(newday),dateformater)
+    end
+
+    h = lpad(string(h),2,'0')
+    m = lpad(string(m),2,'0')
+    s = lpad(string(s),2,'0')
+    return d * "T$h:$m:$s.$dec"
 end
