@@ -96,9 +96,8 @@ function eventstream(aws::AWSConfig;
     )
 
     # grab event id and date from s3path
-    dateformater = DateFormat("yyyy_ddd")
     evid = [parse(Int,replace(basename(s),".ms"=>"")) for s in s3paths]
-    s3dates = Date.([basename(dirname(s)) for s in s3paths],dateformater)
+    s3dates = date_yyyyddd.([basename(dirname(s)) for s in s3paths])
     s3phases = [phasequery(aws,evid[ii],s3dates[ii]) for ii = 1:length(evid)]
     s3events = ec2stream(aws,"scedc-pds",s3paths,rtype=Array)
 
@@ -106,6 +105,15 @@ function eventstream(aws::AWSConfig;
         s3phases[ii] = merge(s3phases[ii],s3events[ii])
     end
     return s3phases
+end
+
+function date_yyyyddd(yearday::String)
+    @assert occursin(r"[1-2][0-9][0-9][0-9]_[0-3][0-6][0-9]",yearday)
+    y,d = split(yearday,"_")
+    yint = parse(Int,y)
+    dint = parse(Int,d)
+    @assert dint <= 366 "Input day must be less than or equal to 366"
+    return Date(yint) + Day(dint-1)
 end
 
 function merge!(EC::EventChannel,SC::SeisChannel)
