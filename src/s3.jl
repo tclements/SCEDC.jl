@@ -120,7 +120,7 @@ function s3query(aws::AWSConfig,
 end
 
 function getCSV(aws,path, params::AbstractArray)
-    filedf = CSV.read(IOBuffer(s3_get(aws,"scedc-pds",path)))
+    filedf = CSV.File(IOBuffer(s3_get(aws,"scedc-pds",path))) |> DataFrame
 
     # subset dataframe
     # filter by lat/lon
