@@ -1,8 +1,10 @@
 module SCEDC
 
 using Dates, DelimitedFiles, Distributed, Random
-using AWSCore, AWSS3, AWSSDK,CSV, DataFrames, SeisIO 
+using AWS, AWSS3, CSV, DataFrames, SeisIO 
 using SeisIO.Quake
+@service S3 
+@service Athena
 
 # include modules
 include("catalog.jl")

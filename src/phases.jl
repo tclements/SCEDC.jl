@@ -72,12 +72,11 @@ function parse_event_header(header::String,N::Int)
 end
 
 """
-    phasequery(aws,eventid,eventtime)
+    phasequery(eventid,eventtime)
 
 Use S3 to query SCEDC-pds phase arrivals for eventid == `eventid`.
 
 # Arguments
-- `aws::AWSConfig`: AWSConfig configuration dictionary
 - `eventid::Int`: SCSN event ID.
 - `eventtime::TimeType`: Time of event. 
 
@@ -96,6 +95,7 @@ function phasequery(aws::AWSConfig,eventid::Int,eventtime::TimeType)
 
     return read_phase(phasestream)
 end
+phasequery(a...) = phasequery(global_aws_config(region="us-west-2"),a...)
 
 function phasestring2df(phasestring::AbstractArray)
     ns = [:NET,:STA,:CHAN,:LOC,:LAT,:LON,:ELEV,:PHASE,:MOTION,:ONSET,:QUAL,:DIST,:OFFSET]

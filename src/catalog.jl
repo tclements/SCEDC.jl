@@ -61,12 +61,9 @@ function read_catalog(catalog)
 end
         
 """
-    catalogquery(aws)
+    catalogquery()
 
 Use S3 to query SCEDC-pds event catalog. Returns a DataFrame of events.
-
-# Arguments
-- `aws::AWSConfig`: AWSConfig configuration dictionary
 
 # Keywords
 - `starttime::TimeType`: The start time/day of the event query.
@@ -82,10 +79,9 @@ Use S3 to query SCEDC-pds event catalog. Returns a DataFrame of events.
 - `eventtype::String`: Event type: {"eq"=>"earthquake", "qb"=> "quarry blast", 
     "sn"=>"sonic boom', "nt"=>"nuclear blast", "uk"=>"not reported","*"=>"all events"}
 """
-function catalogquery(
-    aws::AWSConfig;
-    starttime::TimeType=Date(1932,1,1),
-    endtime::TimeType=Today(),
+function catalogquery(aws::AWSConfig;
+    starttime::TimeType=today(),
+    endtime::TimeType=today(),
     minlatitude::Real=-90,
     maxlatitude::Real=90,
     minlongitude::Real=-180,
@@ -131,6 +127,7 @@ function catalogquery(
     end
     return alldf   
 end
+catalogquery(a...;b...) = catalogquery(global_aws_config(region="us-west-2"), a...; b...)
 
 function parse_hms(d::String,hms::String)
     # check that date matches HH:MM:SS.s syntax 
