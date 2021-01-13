@@ -29,8 +29,7 @@ SCEDC.jl supports direct download and file streaming for continuous data request
 
 ```julia
 # download data using SCEDC on AWS
-using SCEDC, Dates, AWSCore
-aws = aws_config(region="us-west-2")
+using SCEDC, Dates
 bucket = "scedc-pds"
 startdate = Date("2016-07-01")
 enddate = Date("2016-07-01")
@@ -39,20 +38,20 @@ channel = "LH?"
 OUTDIR = "~/data"
 
 # query s3 for matching stations
-filelist = s3query(aws, startdate, enddate=enddate, network=network,channel=channel)
+filelist = s3query(startdate, enddate=enddate, network=network,channel=channel)
 
 # download mseed files to disk 
-ec2download(aws,bucket,filelist,OUTDIR)
+ec2download(bucket,filelist,OUTDIR)
 
 # or stream to an Array of SeisIO.SeisData 
-LHs = ec2stream(aws,bucket,filelist)
+LHs = ec2stream(bucket,filelist)
 ```
 
 To do parallel data transfers, use the `addprocs` function from the `Distributed` module: 
 ```julia
 using Distributed
 addprocs()
-ec2download(aws,bucket,filelist,"~/paralleldir")
+ec2download(bucket,filelist,"~/paralleldir")
 ```
 
 ### Earthquake Catalog Requests 
@@ -69,7 +68,6 @@ SCEDC.jl queries the SCSN earthquake catalog using these possible parameters:
 
 ```julia
 julia> df = catalogquery(
-    aws,
     starttime = DateTime(1937,1,1),
     endtime=DateTime(1937,2,1),
     minlatitude=33.,
@@ -92,7 +90,7 @@ julia> df = catalogquery(
 SCEDC.jl can retrieve phase picks for an earthquake given the event's ID and date. Here is an example from the 1987 Elmore Ranch earthquake with data returned as a `SeisIO.SeisEvent`
 
 ```julia
-julia> phasequery(aws,628016,Date(1987,11,24))
+julia> phasequery(628016,Date(1987,11,24))
 Event 628016: SeisEvent with 70 channels
 
 (.hdr)
@@ -138,7 +136,7 @@ SCEDC.jl can stream waveforms (with associated phase picks) from earthquakes goi
     
 Here is an example of an requesting events from 2019, returned as an `Array` of `SeisEvent` 
 ```julia
-julia> EQ = eventstream(aws,starttime=Date(2019,1,1),endtime=Date(2019,1,2),minmagnitude=2.)
+julia> EQ = eventstream(starttime=Date(2019,1,1),endtime=Date(2019,1,2),minmagnitude=2.)
 julia> EQ[1].data
 SeisIO.Quake.EventTraceData with 2909 channels (3 shown)
     ID: AZ.BZN..BHE                        AZ.BZN..BHN                        AZ.BZN..BHZ                        …
