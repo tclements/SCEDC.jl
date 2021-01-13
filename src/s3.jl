@@ -42,6 +42,8 @@ function indexpath(d::Date)
     outstring *= ystr * "/year_doy="
     outstring *= ystr * '_' * jstr
     outstring *= "/$(ystr)_$(jstr)_waveform_index.csv"
+    # replace "=" character with HTML representation "%3D" for AWS.jl 
+    outstring = replace(outstring,"="=>"%3D")
     return outstring
 end
 
