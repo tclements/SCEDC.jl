@@ -162,4 +162,4 @@ function athenaquery(aws::AWSConfig,bucket::String, query::String;
     end
     return scedcpath.(filelist)
 end
-athenaquery(a...;b...) = athenaquery(AWSConfig(region="us-west-2"),a...;b...)
+athenaquery(a...;b...) = athenaquery(global_aws_config(region="us-west-2"),a...;b...)

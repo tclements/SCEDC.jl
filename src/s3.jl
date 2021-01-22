@@ -118,7 +118,7 @@ function s3query(
     @everywhere paths=$paths
     dfs = pmap(getCSV,fill(aws,N),paths,[params for ii=1:N])
     dfs = vcat(dfs...)
-    return scedcpath.(dfs[:ms_filename])
+    return scedcpath.(dfs[!,:ms_filename])
 end
 s3query(a...;b...) = s3query(global_aws_config(region="us-west-2"),a...;b...)
 
