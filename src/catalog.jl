@@ -55,7 +55,7 @@ function read_catalog(catalog)
 
     # format dates 
     dateformater = Dates.DateFormat("y/m/dTH:M:S.s")
-    df["EVENTTIME"] = DateTime.(parse_hms.(df[!,"YYYY/MM/DD"],df[!,"HH:mm:SS.ss"]),dateformater)
+    df[!,"EVENTTIME"] = DateTime.(parse_hms.(df[!,"YYYY/MM/DD"],df[!,"HH:mm:SS.ss"]),dateformater)
     select!(df,Not([Symbol("YYYY/MM/DD"),Symbol("HH:mm:SS.ss")]))
     return df
 end
