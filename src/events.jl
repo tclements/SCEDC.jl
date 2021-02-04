@@ -2,12 +2,9 @@ export eventpaths, eventstream
 import SeisIO: merge,merge!
 
 """
-     eventpaths(aws)
+     eventpaths()
 
 Use S3 to query SCEDC-pds event paths. Returns array of event S3 paths.
-
-# Arguments
-- `aws::AWSConfig`: AWSConfig configuration dictionary
 
 # Keywords
 - `starttime::TimeType`: The start time/day of the event query.
@@ -25,8 +22,8 @@ Use S3 to query SCEDC-pds event paths. Returns array of event S3 paths.
 """
 function eventpaths(
     aws::AWSConfig;
-    starttime::TimeType=Date(1977,1,1),
-    endtime::TimeType=Today(),
+    starttime::TimeType=today(),
+    endtime::TimeType=today(),
     minlatitude::Real=-90,
     maxlatitude::Real=90,
     minlongitude::Real=-180,
@@ -64,13 +61,16 @@ function eventpaths(
     end 
     return paths
 end
+eventpaths(a...;b...) = eventpaths(global_aws_config(region="us-west-2"),a...;b...)
+eventpaths(d::Dict,a...;b...) = eventpaths(global_aws_config(region=d[:region]),a...;b...)
 
 function eventdownload()
 end
 
-function eventstream(aws::AWSConfig;
-    starttime::TimeType=Date(1977,1,1),
-    endtime::TimeType=Today(),
+function eventstream(
+    aws::AWSConfig;
+    starttime::TimeType=today(),
+    endtime::TimeType=today(),
     minlatitude::Real=-90,
     maxlatitude::Real=90,
     minlongitude::Real=-180,
@@ -98,7 +98,7 @@ function eventstream(aws::AWSConfig;
     # grab event id and date from s3path
     evid = [parse(Int,replace(basename(s),".ms"=>"")) for s in s3paths]
     s3dates = date_yyyyddd.([basename(dirname(s)) for s in s3paths])
-    s3phases = [phasequery(aws,evid[ii],s3dates[ii]) for ii = 1:length(evid)]
+    s3phases = [phasequery(evid[ii],s3dates[ii]) for ii = 1:length(evid)]
     s3events = ec2stream(aws,"scedc-pds",s3paths,rtype=Array)
 
     for ii = 1:length(s3events)
@@ -106,6 +106,8 @@ function eventstream(aws::AWSConfig;
     end
     return s3phases
 end
+eventstream(a...;b...) = eventstream(global_aws_config(region="us-west-2"), a...; b...)
+eventstream(d::Dict,a...;b...) = eventstream(global_aws_config(region=d[:region]), a...; b...)
 
 function date_yyyyddd(yearday::String)
     @assert occursin(r"[1-2][0-9][0-9][0-9]_[0-3][0-6][0-9]",yearday)

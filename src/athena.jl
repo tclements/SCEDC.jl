@@ -1,11 +1,10 @@
 export athenasetup, athenaquery
 """
-  athenasetup(aws,bucket)
+  athenasetup(bucket)
 
 Create AWS Athena database and table for SQL queries.
 
 # Arguments
-- `aws::AWSConfig`: AWSConfig configuration dictionary
 - `bucket::String`: Name of AWS bucket to store query results
 """
 function athenasetup(aws::AWSConfig,bucket::String;
@@ -20,9 +19,9 @@ function athenasetup(aws::AWSConfig,bucket::String;
 
     # create database
     println("Creating database '$database' ",now())
-    AWSSDK.Athena.start_query_execution(aws,QueryString="create database $database",
-        ResultConfiguration=["OutputLocation" => "s3://$bucket/queries/"],
-        ClientRequestToken=randstring(32))
+    Athena.start_query_execution("create database $database",
+        Dict("ResultConfiguration"=>Dict("OutputLocation" => "s3://$bucket/queries/"),
+        "ClientRequestToken"=>randstring(32)))
 
     # string to create table
     tablestr = """CREATE EXTERNAL TABLE IF NOT EXISTS $table ( `ms_filename` string,""" *
@@ -36,25 +35,27 @@ function athenasetup(aws::AWSConfig,bucket::String;
 
     # create table
     println("Creating table '$table' ",now())
-    AWSSDK.Athena.start_query_execution(aws,QueryString=tablestr,
-       ResultConfiguration=["OutputLocation" => "s3://$bucket/queries/"],
-       ClientRequestToken=randstring(32),
-       QueryExecutionContext = ["Database" => database])
+    Athena.start_query_execution(tablestr,
+       Dict("ResultConfiguration"=>Dict("OutputLocation" => "s3://$bucket/queries/"),
+       "ClientRequestToken"=>randstring(32),
+       "QueryExecutionContext" => Dict("Database" => database))
+    )
 
     sleep(1)
 
     # update partitions
     println("Repairing table '$table' ",now())
-    output = AWSSDK.Athena.start_query_execution(aws,QueryString="MSCK REPAIR TABLE $table",
-           ResultConfiguration=["OutputLocation" => "s3://$bucket/queries/"],
-           ClientRequestToken=randstring(32),
-           QueryExecutionContext = ["Database" => database])
+    output = Athena.start_query_execution("MSCK REPAIR TABLE $table",
+           Dict("ResultConfiguration"=>Dict("OutputLocation" => "s3://$bucket/queries/"),
+           "ClientRequestToken"=>randstring(32),
+           "QueryExecutionContext"=>Dict("Database" => database))
+    )
 
     # wait until done
     finished = false
     while !finished
-        queryresult = AWSSDK.Athena.get_query_execution(aws,output)
-        if queryresult["QueryExecutionDetail"]["Status"] == "SUCCEEDED"
+        queryresult = Athena.get_query_execution(output["QueryExecutionId"])
+        if queryresult["QueryExecutionDetail"]["Status"]["State"] == "SUCCEEDED"
             finished = true
             println("REPAIR table $table finished ",now())
         elseif queryresult["QueryExecutionDetail"]["Status"]["State"] == "FAILED"
@@ -65,9 +66,11 @@ function athenasetup(aws::AWSConfig,bucket::String;
     end
    return nothing
 end
+athenasetup(a...;b...) = athenasetup(global_aws_config(region="us-west-2"),a...;b...)
+athenasetup(d::Dict,a...;b...) = athenasetup(global_aws_config(region=d[:region]),a...;b...)
 
 """
-  athenaquery(aws,bucket,query)
+  athenaquery(bucket,query)
 
 Use AWS Athena to query SCEDC-pds database.
 
@@ -90,7 +93,6 @@ See https://docs.aws.amazon.com/athena/latest/ug/presto-functions.html for possi
 
 
 # Arguments
-- `aws::AWSConfig`: AWSConfig configuration dictionary
 - `bucket::String`: Name of AWS bucket to store query results
 - `query::String`: SQL query for SCEDC-pds database.
 
@@ -122,16 +124,17 @@ function athenaquery(aws::AWSConfig,bucket::String, query::String;
     end
 
     # query the table
-    output = AWSSDK.Athena.start_query_execution(aws,
-        QueryString="select ms_filename from $table where $query order by ms_filename ",
-        ResultConfiguration=["OutputLocation" => "s3://$bucket/queries/"],
-        ClientRequestToken=randstring(32),
-        QueryExecutionContext = ["Database" => database])
+    output = Athena.start_query_execution(
+        "select ms_filename from $table where $query order by ms_filename ",
+        Dict("ResultConfiguration"=>Dict("OutputLocation" => "s3://$bucket/queries/"),
+        "ClientRequestToken"=>randstring(32),
+        "QueryExecutionContext" => Dict("Database" => database))
+    )
 
     # check when query is finished
     finished = false
     while !finished
-         queryresult = AWSSDK.Athena.get_query_execution(aws,output)
+         queryresult = Athena.get_query_execution(output["QueryExecutionId"])
          if queryresult["QueryExecutionDetail"]["Status"]["State"] == "SUCCEEDED"
              finished = true
              println("QUERY '$query' finished ",now())
@@ -160,3 +163,5 @@ function athenaquery(aws::AWSConfig,bucket::String, query::String;
     end
     return scedcpath.(filelist)
 end
+athenaquery(a...;b...) = athenaquery(global_aws_config(region="us-west-2"),a...;b...)
+athenaquery(d::Dict,a...;b...) = athenaquery(global_aws_config(region=d[:region]),a...;b...)

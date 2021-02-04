@@ -1,11 +1,10 @@
 export ec2download, ec2stream, getXML
 
 """
-  ec2download(aws,bucket,filelist,OUTDIR)
+  ec2download(bucket,filelist,OUTDIR)
 
 Download files using pmap from S3 to EC2.
 # Arguments
-- `aws::AWSConfig`: AWSConfig configuration dictionary
 - `bucket::String`: S3 bucket to download from.
 - `filelist::Array{String}`: Filepaths to download in `bucket`.
 - `OUTDIR::String`: The output directory on EC2 instance.
@@ -17,21 +16,24 @@ Download files using pmap from S3 to EC2.
 
 """
 function ec2download(
-    aws::AWSConfig,bucket::String,filelist::Array{String},OUTDIR::String;
-    v::Int=0,
+	aws::AWSConfig,
+	bucket::String,
+	filelist::Array{String},
+	OUTDIR::String;
+	v::Int=0,
 	XML::Bool=false,
 )
 
 	# check being run on AWS
 	tstart = now()
-	!localhost_is_ec2() && @warn("Running locally. Run on EC2 for maximum performance.")
+	!AWS.localhost_is_ec2() && @warn("Running locally. Run on EC2 for maximum performance.")
 
 	println("Starting Download...      $(now())")
 	println("Using $(nworkers()) cores...")
 
 	# send files everywhere
-	@eval @everywhere aws=$aws
 	@eval @everywhere filelist=$filelist
+	@eval @everywhere aws=$aws
 
 	# create output files
 	OUTDIR = expanduser(OUTDIR)
@@ -55,16 +57,16 @@ function ec2download(
     startsize = diskusage(OUTDIR)
     if v > 0
 	    pmap(
-            s3_file_map,
-            fill(aws,length(outfiles)),
+			s3_file_map,
+			fill(aws,length(outfiles)),
             fill(bucket,length(outfiles)),
             filelist,
             outfiles
         )
     else
         pmap(
-            s3_get_file,
-            fill(aws,length(outfiles)),
+			s3_get_file,
+			fill(aws,length(outfiles)),
             fill(bucket,length(outfiles)),
             filelist,
             outfiles,
@@ -82,13 +84,14 @@ function ec2download(
 	println("Download rate $(formatbytes(Int(round(downloadsize / downloadseconds))))/s")
 	return nothing
 end
+ec2download(a...;b...) = ec2download(global_aws_config(region="us-west-2"), a...; b...)
+ec2download(d::Dict,a...;b...) = ec2download(global_aws_config(region=d[:region]), a...; b...)
 
 """
-  ec2stream(aws,bucket,filelist)
+  ec2stream(bucket,filelist)
 
 Stream files using pmap from S3 to EC2.
 # Arguments
-- `aws::AWSConfig`: AWSConfig configuration dictionary
 - `bucket::String`: S3 bucket to download from.
 - `filelist::Array{String}`: Filepaths to stream from `bucket`.
 
@@ -106,7 +109,9 @@ Stream files using pmap from S3 to EC2.
     to `SeisData`. Use `Array` to return an `Array` of `SeisData`.
 """
 function ec2stream(
-    aws::AWSConfig,bucket::String,filelist::Array{String};
+	aws::AWSConfig,
+	bucket::String,
+	filelist::Array{String};
     demean::Bool = false,
     detrend::Bool = false,
     msr::Bool = false,
@@ -121,7 +126,7 @@ function ec2stream(
 )
 
 	# check being run on AWS
-	!localhost_is_ec2() && @warn("Running locally. Run on EC2 for maximum performance.")
+	!AWS.localhost_is_ec2() && @warn("Running locally. Run on EC2 for maximum performance.")
 
 	# send files everywhere
 	@eval @everywhere aws=$aws
@@ -130,8 +135,8 @@ function ec2stream(
 
 	# do transfer to ec2
 	Sarray =  pmap(
-        s3_get_seed,
-        fill(aws,length(filelist)),
+		s3_get_seed,
+		fill(aws,length(filelist)),
         fill(bucket,length(filelist)),
         filelist,
         fill(demean,length(filelist)),
@@ -149,15 +154,15 @@ function ec2stream(
 	    return SeisData(Sarray...)
     end
     return Sarray
-
 end
+ec2stream(a...;b...) = ec2stream(global_aws_config(region="us-west-2"), a...; b...)
+ec2stream(d::Dict,a...;b...) = ec2stream(global_aws_config(region=d[:region]), a...; b...)
 
 """
-  getXML(aws,bucket,filelist,XMLDIR)
+  getXML(bucket,filelist,XMLDIR)
 
 Download XML files using pmap from S3 to EC2.
 # Arguments
-- `aws::AWSConfig`: AWSConfig configuration dictionary
 - `bucket::String`: S3 bucket to download from.
 - `filelist::Array{String}`: Filepaths to download in `bucket`.
 - `XMLDIR::String`: The output directory for stationXML files on EC2 instance.
@@ -182,7 +187,7 @@ function getXML(
 	# get all files if needed
 	prefix = "FDSNstationXML/CI/" # change this if more nets added
 	if getall
-		filelist = collect(s3_list_keys(aws,bucket,prefix))
+		filelist = collect(s3_list_keys(bucket,prefix))
 		filelist = [replace(f,"_"=>"") for f in filelist]
 		filelist = [replace(f,".xml"=>"__") for f in filelist]
 	end
@@ -208,7 +213,7 @@ function getXML(
 	# download files
 	if v > 0
 	    pmap(
-            s3_file_map,
+			s3_file_map,
 			fill(aws,length(infiles)),
 			fill(bucket,length(infiles)),
 			infiles,
@@ -225,15 +230,20 @@ function getXML(
     end
 	return nothing
 end
+getXML(a...;b...) = getXML(global_aws_config(region="us-west-2"),a...;b...)
+getXML(d::Dict,a...;b...) = getXML(global_aws_config(region=d[:region]),a...;b...)
 
 function s3_file_map(aws::AWSConfig,bucket::String,filein::String,fileout::String)
-    s3_get_file(aws, bucket, filein, fileout)
+    s3_get_file(aws,bucket, filein, fileout)
     println("Downloading file: $filein       \r")
 	return nothing
 end
+s3_file_map(a...) = s3_file_map(global_aws_config(region="us-west-2"),a...)
+s3_file_map(d::Dict,a...) = s3_file_map(global_aws_config(region=d[:region]),a...)
 
 function s3_get_seed(
-	aws::AWSConfig,bucket::String,
+	aws::AWSConfig,
+	bucket::String,
 	filein::String,
     demean::Bool,
     detrend::Bool,
@@ -246,8 +256,8 @@ function s3_get_seed(
     resample::Bool,
     fs::Real,
 )
-    f = s3_get(aws, bucket, filein)
-	S = parseseed(f)
+    stream = S3.get_object(bucket, filein,aws_config=aws)
+	S = parseseed(stream)
 
 	# remove empty channels
 	if prune == true
@@ -294,6 +304,8 @@ function s3_get_seed(
 
 	return S
 end
+s3_get_seed(a...;b...) = s3_get_seed(global_aws_config(region="us-west-2"),a...;b...)
+s3_get_seed(d::Dict,a...;b...) = s3_get_seed(global_aws_config(region=d[:region]),a...;b...)
 
 function formatbytes(bytes::Real, digits::Int=1)
 	units = ["B", "KB", "MB", "GB", "TB","PB"]

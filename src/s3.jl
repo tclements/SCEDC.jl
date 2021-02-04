@@ -42,6 +42,8 @@ function indexpath(d::Date)
     outstring *= ystr * "/year_doy="
     outstring *= ystr * '_' * jstr
     outstring *= "/$(ystr)_$(jstr)_waveform_index.csv"
+    # replace "=" character with HTML representation "%3D" for AWS.jl 
+    outstring = replace(outstring,"="=>"%3D")
     return outstring
 end
 
@@ -57,12 +59,11 @@ function scedcpath(filename::String)
 end
 
 """
-  s3query(aws,startdate)
+  s3query(startdate)
 
 Use S3 to query SCEDC-pds database.
 
 # Arguments
-- `aws::AWSConfig`: AWSConfig configuration dictionary
 - `startdate::Date`: The start day of the download.
 - `enddate::Date`: The (optional) end day of the download.
 - `network::String`: Network to download from. If network = "*" or is unspecified,
@@ -79,7 +80,8 @@ Use S3 to query SCEDC-pds database.
 - `minlongitude::Float64`: Minimum longitude in data search.
 - `maxlongitude::Float64`: Maximum longitude in data search.
 """
-function s3query(aws::AWSConfig,
+function s3query(
+                  aws::AWSConfig,
                   startdate::Date;
 			  	  enddate::Union{Date,Nothing}=nothing,
                   network::Union{String,Nothing}=nothing,
@@ -89,10 +91,10 @@ function s3query(aws::AWSConfig,
                   minlatitude::Union{Float64,Nothing}=nothing,
                   maxlatitude::Union{Float64,Nothing}=nothing,
                   minlongitude::Union{Float64,Nothing}=nothing,
-                  maxlongitude::Union{Float64,Nothing}=nothing)
+                  maxlongitude::Union{Float64,Nothing}=nothing,
+)
 
-	!localhost_is_ec2() && @warn("Running locally. Run on EC2 for maximum performance.")
-	@eval @everywhere aws=$aws
+	!AWS.localhost_is_ec2() && @warn("Running locally. Run on EC2 for maximum performance.")
     firstdate = Date(2000,1,1)
 
 	if isnothing(enddate)
@@ -116,10 +118,12 @@ function s3query(aws::AWSConfig,
     @everywhere paths=$paths
     dfs = pmap(getCSV,fill(aws,N),paths,[params for ii=1:N])
     dfs = vcat(dfs...)
-    return scedcpath.(dfs[:ms_filename])
+    return scedcpath.(dfs[!,:ms_filename])
 end
+s3query(a...;b...) = s3query(global_aws_config(region="us-west-2"),a...;b...)
+s3query(d::Dict,a...;b...) = s3query(global_aws_config(region=d[:region]),a...;b...)
 
-function getCSV(aws,path, params::AbstractArray)
+function getCSV(aws::AWSConfig,path, params::AbstractArray)
     filedf = CSV.File(IOBuffer(s3_get(aws,"scedc-pds",path))) |> DataFrame
 
     # subset dataframe
