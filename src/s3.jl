@@ -121,6 +121,7 @@ function s3query(
     return scedcpath.(dfs[!,:ms_filename])
 end
 s3query(a...;b...) = s3query(global_aws_config(region="us-west-2"),a...;b...)
+s3query(d::Dict,a...;b...) = s3query(global_aws_config(region=d[:region]),a...;b...)
 
 function getCSV(aws::AWSConfig,path, params::AbstractArray)
     filedf = CSV.File(IOBuffer(s3_get(aws,"scedc-pds",path))) |> DataFrame

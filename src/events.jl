@@ -61,7 +61,8 @@ function eventpaths(
     end 
     return paths
 end
-eventpaths(a...;b...) = eventpaths(global_aws_config(),a...;b...)
+eventpaths(a...;b...) = eventpaths(global_aws_config(region="us-west-2"),a...;b...)
+eventpaths(d::Dict,a...;b...) = eventpaths(global_aws_config(region=d[:region]),a...;b...)
 
 function eventdownload()
 end
@@ -105,7 +106,8 @@ function eventstream(
     end
     return s3phases
 end
-eventstream(a...;b...) = eventstream(global_aws_config(), a...; b...)
+eventstream(a...;b...) = eventstream(global_aws_config(region="us-west-2"), a...; b...)
+eventstream(d::Dict,a...;b...) = eventstream(global_aws_config(region=d[:region]), a...; b...)
 
 function date_yyyyddd(yearday::String)
     @assert occursin(r"[1-2][0-9][0-9][0-9]_[0-3][0-6][0-9]",yearday)

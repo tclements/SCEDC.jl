@@ -67,6 +67,7 @@ function athenasetup(aws::AWSConfig,bucket::String;
    return nothing
 end
 athenasetup(a...;b...) = athenasetup(global_aws_config(region="us-west-2"),a...;b...)
+athenasetup(d::Dict,a...;b...) = athenasetup(global_aws_config(region=d[:region]),a...;b...)
 
 """
   athenaquery(bucket,query)
@@ -163,3 +164,4 @@ function athenaquery(aws::AWSConfig,bucket::String, query::String;
     return scedcpath.(filelist)
 end
 athenaquery(a...;b...) = athenaquery(global_aws_config(region="us-west-2"),a...;b...)
+athenaquery(d::Dict,a...;b...) = athenaquery(global_aws_config(region=d[:region]),a...;b...)

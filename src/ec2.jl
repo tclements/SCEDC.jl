@@ -85,6 +85,7 @@ function ec2download(
 	return nothing
 end
 ec2download(a...;b...) = ec2download(global_aws_config(region="us-west-2"), a...; b...)
+ec2download(d::Dict,a...;b...) = ec2download(global_aws_config(region=d[:region]), a...; b...)
 
 """
   ec2stream(bucket,filelist)
@@ -155,6 +156,7 @@ function ec2stream(
     return Sarray
 end
 ec2stream(a...;b...) = ec2stream(global_aws_config(region="us-west-2"), a...; b...)
+ec2stream(d::Dict,a...;b...) = ec2stream(global_aws_config(region=d[:region]), a...; b...)
 
 """
   getXML(bucket,filelist,XMLDIR)
@@ -229,6 +231,7 @@ function getXML(
 	return nothing
 end
 getXML(a...;b...) = getXML(global_aws_config(region="us-west-2"),a...;b...)
+getXML(d::Dict,a...;b...) = getXML(global_aws_config(region=d[:region]),a...;b...)
 
 function s3_file_map(aws::AWSConfig,bucket::String,filein::String,fileout::String)
     s3_get_file(aws,bucket, filein, fileout)
@@ -236,6 +239,7 @@ function s3_file_map(aws::AWSConfig,bucket::String,filein::String,fileout::Strin
 	return nothing
 end
 s3_file_map(a...) = s3_file_map(global_aws_config(region="us-west-2"),a...)
+s3_file_map(d::Dict,a...) = s3_file_map(global_aws_config(region=d[:region]),a...)
 
 function s3_get_seed(
 	aws::AWSConfig,
@@ -301,6 +305,7 @@ function s3_get_seed(
 	return S
 end
 s3_get_seed(a...;b...) = s3_get_seed(global_aws_config(region="us-west-2"),a...;b...)
+s3_get_seed(d::Dict,a...;b...) = s3_get_seed(global_aws_config(region=d[:region]),a...;b...)
 
 function formatbytes(bytes::Real, digits::Int=1)
 	units = ["B", "KB", "MB", "GB", "TB","PB"]

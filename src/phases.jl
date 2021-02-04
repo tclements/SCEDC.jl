@@ -96,6 +96,7 @@ function phasequery(aws::AWSConfig,eventid::Int,eventtime::TimeType)
     return read_phase(phasestream)
 end
 phasequery(a...) = phasequery(global_aws_config(region="us-west-2"),a...)
+phasequery(d::Dict,a...) = phasequery(global_aws_config(region=d[:region]),a...)
 
 function phasestring2df(phasestring::AbstractArray)
     ns = [:NET,:STA,:CHAN,:LOC,:LAT,:LON,:ELEV,:PHASE,:MOTION,:ONSET,:QUAL,:DIST,:OFFSET]

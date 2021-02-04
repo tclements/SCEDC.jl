@@ -128,6 +128,7 @@ function catalogquery(aws::AWSConfig;
     return alldf   
 end
 catalogquery(a...;b...) = catalogquery(global_aws_config(region="us-west-2"), a...; b...)
+catalogquery(d::Dict, a...;b...) = catalogquery(global_aws_config(region=d[:region]), a...; b...)
 
 function parse_hms(d::String,hms::String)
     # check that date matches HH:MM:SS.s syntax 
